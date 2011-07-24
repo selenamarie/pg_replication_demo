@@ -1,0 +1,353 @@
+Harder, Better, Faster, Stronger: PostgreSQL 9.1
+
+Take away: Postgres' role is to disrupt Oracle/SQL Server biz
+* Specifically, data warehousing and custom application building where
+  PostgreSQL is easily a drop-in replacement
+* Also becoming a choice for web frameworks, thanks to Django and others who
+  have made Postgres-compat more of a reality
+* Not a replacement for MySQL, typically. tl;dr version: data migration is not
+  easy, and most apps make it too hard/expensive to rewrite.
+
+== Disrupt the licensing model for DBs
+STORY:
+- One client is paying >$1 million in licenses and wrote "DEATH TO ORACLE" on
+  their whiteboard
+- They don't dare change their current licenses - even though they're not
+  using features, because rep threatened to reprice them at list-price
+
+- Ecosystem around Postgres: 
+    BEFORE 9.1: 
+        PGFoundry
+        Indies
+
+    AFTER 9.1: 
+        Extensions --> PGXN
+
+- Compare to Linux before distributions.. next logical step is that we'll have
+  distributions
+- Makes data warehouses and experimental projects WAY cheaper
+
+== Career path for Oracle DBAs
+- Postgres has a talent gap: companies can't find enough DBAs
+- Postgres is close enough to Oracle that Oracle DBAs can jump in
+- Difficulties include tools issues:
+    * Linux-ish automation foreign to some DBAs from Winwdows world
+    * No TOAD equivalent (Maybe PEM will be this?)
+
+== Web Development frameworks
+- Postgres is a "developers database"
+- Intended to be extended (easy to add types, PLs in every major interpreted
+  language, plus more)
+- Default and RECOMMENDED database for Django
+    We need to do more work on being the database of choice for more platforms
+- Oracle is pursuing PHP developers, which actually makes things better for
+  Postgres and more likely that drivers and compatibility 
+
+== Features context
+* All examples based on REL9_1_BETA2
+* Syntax *shouldn't* change but worth verifying :)
+
+Developer documentation for 9.1: http://developer.postgresql.org/
+
+Press release for 9.1 alpha: 
+XXX Hmm. I guess we didn't do a press release and kit for 9.1 like we did for 9.0 yet.
+
+== Getting set up from source
+Built with: 
+git checkout REL9_1_BETA2
+./configure --with-perl --with-python --prefix=/opt/pg91beta2 --with-readline
+make 
+make install
+
+
+== SE-Postgres
+* SE-Linux security label support! Originally a NSA-funded Linux kernel extension
+* For tablespace, schema, table, column, sequence, view and procedure object classes
+
+== Built-in Replication 
+* WAL-based replication varieties:
+    File-based (default 16-MB files)
+    Streaming (per-WAL record) (9.0)
+    Asynchronous
+    Warm standby
+    Hot standby (9.0)
+    Synchronous (9.1)
+    Heikki's slides: http://www.pgcon.org/2010/schedule/attachments/149_PGCon2010-Built-in-Replication.pdf
+
+== Replication Tools
+    pg_stat_replication view shows all replicas and their statuses 
+    pg_basebackup single-command cloning over port 5432  http://www.postgresql.org/docs/9.1/static/app-pgbasebackup.html
+    promote to master pg_ctl promote formerly only could do this by creating a trigger file
+    new functions  pg_last_xact_replay_timestamp()  pg_xlog_replay_pause()
+
+== Writeable CTE
+But first - What’s a CTE? 
+  Common Table Expressions -- thought of as a temporary table or VIEW that exists for just a single query.
+
+Makes SQL much more expressive and flexible.
+http://developer.postgresql.org/pgdocs/postgres/queries-with.html#QUERIES-WITH-MODIFYING
+
+Euler Project, question 1: 
+    If we list all the natural numbers below 10 that are multiples of 3 or 5, we get 3, 5, 6 and 9. The sum of these multiples is 23.
+    Find the sum of all the multiples of 3 or 5 below 1000.
+
+<pre>
+WITH RECURSIVE t1(a, b) AS (
+        VALUES(0,0)
+    UNION ALL
+        SELECT CASE CAST(b AS BOOLEAN)
+                      WHEN b % 3 = 0 THEN b
+                      WHEN b % 5 = 0 THEN b
+                END,
+                b + 1
+          FROM t1
+         WHERE b < 1000
+)
+SELECT sum(a) FROM t1
+</pre>
+
+
+More examples: http://www.depesz.com/index.php/2011/03/16/waiting-for-9-1-writable-cte/
+http://xzilla.net/blog/2011/Mar/Upserting-via-Writeable-CTE.html
+
+== Writeable CTE
+
+Maintaining partitions: 
+WITH deleted_posts AS ( 
+  DELETE FROM posts    WHERE created < now()       - '6 months'::INTERVAL    RETURNING *  ) SELECT user_id, count(*) FROM 
+deleted_posts group BY 1;
+
+Multiple table updates in the same statement, with a post-update action (like a trigger): (from depesz)
+
+<pre>
+WITH deleted_posts AS (
+
+    DELETE FROM posts
+        WHERE created < now() - '6 months'::INTERVAL
+        RETURNING *
+
+), deleted_per_user as (
+
+    SELECT user_id, count(*)
+        FROM deleted_posts
+        GROUP BY 1
+)
+
+UPDATE counts
+    SET posts_count = posts_count - d.count
+    FROM deleted_per_user d
+    WHERE d.user_id = counts.user_id;
+</pre>
+
+== Per-column collation
+
+Now, we can have multiple languages in the same table, and have the sorts work
+properly!
+
+Very detailed demonstration of capabilities: 
+* http://www.depesz.com/index.php/2011/03/04/waiting-for-9-1-per-column-collation-support/
+
+<pre>
+$ select * from normal_czech order by some_text;
+ some_text
+-----------
+ 1234
+ červený
+ chleba
+ cihla
+ damašek
+ kůň
+ zelí
+ žluťoučký
+(8 rows)
+ 
+
+$ select * from normal_polish order by some_text;
+ some_text
+-----------
+ alfa
+ car
+ ćma
+ coś
+ lama
+ łódka
+ mama
+ ser
+ śnieg
+ szopa
+ tata
+ źdźbło
+ żółw
+ zorza
+(14 rows)
+</pre>
+
+but now!
+
+<pre>
+$ copy collated_polish from '/tmp/polish';
+COPY 14
+
+$ select * from collated_polish order by some_text;
+ some_text
+-----------
+ alfa
+ car
+ coś
+ ćma
+ lama
+ łódka
+ mama
+ ser
+ szopa
+ śnieg
+ tata
+ zorza
+ źdźbło
+ żółw
+(14 rows)
+</pre>
+
+This is possible on a *per column* basis, not just per-table. 
+
+== Extensions
+
+Like Oracle "packages"
+End user view: http://facility9.com/2011/03/postgresql-extensions/
+
+Docs: http://developer.postgresql.org/pgdocs/postgres/sql-createextension.html
+
+Basically, you'll be able to install extensions like any other code, and have
+backup/restore work the way that you'd expect for things that are like
+libraries or ddls - only backup the user-defined changes, and then rely on
+extension mechanism for restoring core code. 
+
+Developer view: http://wiki.postgresql.org/images/0/00/PGDay2010-Extensions.pdf
+Training for extension developers: http://wiki.postgresql.org/wiki/PDXPUGDay2011#Building_and_Distributing_PostgreSQL_Extensions_Without_Learning_C_.28David_E._Wheeler.29
+
+== K-Nearest Neighbor Indexing
+
+Wiki: http://wiki.postgresql.org/wiki/What's_new_in_PostgreSQL_9.1#K-Nearest-Neighbor_Indexing
+Developer: http://www.sai.msu.su/~megera/postgres/talks/pgday-2010.pdf
+
+Incredibly fast search for things that are "near" a particular object
+Operator is: <->
+
+For now, this work has been done for the point datatype, the pg_trgm contrib,
+and many btree_gist datatypes
+
+Test: 
+
+$ create table test ( position point );
+$ insert into test (position) select point( random() * 1000, random() * 1000) from generate_series(1,1000000);
+$ create index q on test using gist ( position );
+$ select *, position <-> point(500,500) from test order by position <-> point(500,500) limit 10;
+
+$ explain analyze select *, position <-> point(500,500) from test order by
+position <-> point(500,500) limit 10;
+
+                                                        QUERY PLAN
+
+--------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.00..0.77 rows=10 width=16) (actual time=0.164..0.475 rows=10 loops=1)
+   ->  Index Scan using q on test  (cost=0.00..76512.60 rows=1000000 width=16) (actual time=0.163..0.473 rows=10 loops=1)
+         Order By: ("position" <-> '(500,500)'::point)
+
+== Unlogged Tables
+
+Background: every write to a table in Postgres is essentiall *two* writes
+because of the Write Ahead Log (basis for replication, and durability
+guarantees)
+
+Unlogged tables are FREED of pernicious durability constraints
+
+Could think of them as Global Temporary tables (see Haas' post)
+
+* http://www.depesz.com/index.php/2011/01/03/waiting-for-9-1-unlogged-tables/
+* http://rhaas.blogspot.com/2010/05/global-temporary-and-unlogged-tables.html
+
+Example: 
+=$ perl -le 'my $x = "aaaaaaaa"; for (1..450000) {print $x++}' | \ 
+    perl -pe 's/.*/(\047$&\047)/;s/\s*\z/,/ if $.%3' | \ 
+    sed 's/.*/insert into test (some_text) values &;/'
+
+== SSI
+Wiki: http://wiki.postgresql.org/wiki/SSI
+Developer: 
+My notes from Kevin's version of the talk: http://www.chesnok.com/daily/2011/03/24/raw-notes-from-kevin-grittners-talk-on-ssi/
+
+Serializable Snapshot Isolation
+* PostgreSQL's is the first production implementation of the standard
+* *per transaction* support, so you don't have to enable it for EVERY
+  transaction or per session, etc.
+
+Why use it? 
+* No more blocking on table locks! 
+* No more "select for update"
+* Simplifies programming
+
+Caveats if you use it: 
+* must be prepared to handle serialization failures (queries just exit)
+* read-only queries might fail (instead of blocking)
+* Not yet supported for Hot Standby
+
+
+== Foreign Data Wrappers
+
+* Remote datasource access
+* Initially implemented TEXT and CSV data sources
+* Google Summer of Code student is working on other data sources
+* Underway currently: Oracle and MySQL sources
+
+Awesome because: 
+* 6-function API for implementing
+* Good for implementing imports, things which would otherwise fail if you just
+  used COPY (imporoving COPY is a whole other rant...)
+
+Not awesome because: 
+* Nothing other than sequential scans are possible for query plans
+* Not that many data sources implemented yet
+
+But srsly, it's not that hard... Expect tons of FDWs to be implemented once we
+get 9.1 to production release 
+
+== Syncronous Replication
+Brief background on built-in Postgres replication: 
+* WAL stands for "write ahead log" and it is what ensures durability for all
+  write operations
+* WAL-shipping 16-MB chunks of these records was the pre-9.0 method for
+  built-in replication
+* 9.0 and later have Streaming replication - per WAL record (basically,
+  per-commit) shipping of changes
+* WAL are logical level changes to database pages, NOT statement-based
+* All-or-nothing wrt databases and tables; can't just replicate some things as
+  is possible with statement-based or trigger-based replication
+
+User:
+http://developer.postgresql.org/pgdocs/postgres/warm-standby.html#SYNCHRONOUS-REPLICATION
+(kind of terrible for a person trying to understand how it works)
+
+Somewhat better:
+http://wiki.postgresql.org/wiki/What%27s_new_in_PostgreSQL_9.1#Synchronous_replication_and_other_replication_features
+
+Wiki: http://wiki.postgresql.org/wiki/Synchronous_replication
+
+Probably our most important feature!
+
+This is *the* most important use case for WAL-level replication. 
+
+Outline of steps:
+
+* Create a replication role (no longer a forced role creation like in 9.0)
+* pg_hba.conf (host based authorization) update to allow replication user to
+  access system
+* Five key configuration options: wal_level, max_wal_senders, archive_mode,
+  archive_command, synchronous_standby_names
+* Create a base backup that will be the slave
+* recovery.conf config: restore_command, standby_mode, primary_conninfo,
+  trigger_file
+
+== Acknowlegements
+
+Josh Berkus: http://www.pgexperts.com/document.html?id=50
+Depesz: http://www.depesz.com/
