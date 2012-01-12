@@ -1,0 +1,9 @@
+default settings from the html docs don't work with a modern AIR
+
+This worked: 
+
+kern.sysv.shmmax=8388608
+kern.sysv.shmmin=1
+kern.sysv.shmmni=32
+kern.sysv.shmseg=8
+kern.sysv.shmall=4276224

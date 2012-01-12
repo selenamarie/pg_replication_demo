@@ -1,2 +1,5 @@
-export PATH=/opt/pg91beta2/bin:$PATH
-initdb -D oscon_demo -E UTF8
+#!/bin/sh
+
+source variables.sh
+
+initdb -D $DATA_DIR -E UTF8

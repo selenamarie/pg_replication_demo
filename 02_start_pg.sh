@@ -1,2 +1,4 @@
-export PATH=/opt/pg91beta2/bin:$PATH
-pg_ctl -D oscon_demo start -l oscon_demo.log
+#!/bin/sh
+
+source variables.sh
+pg_ctl -D $DATA_DIR start -l $DATA_DIR.log

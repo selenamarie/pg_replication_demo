@@ -1,7 +1,10 @@
-export PATH=/opt/pg91beta2/bin:$PATH
-pg_ctl -D oscon_demo stop -m immediate
-pg_ctl -D oscon_demo_repl stop -m immediate
+#!/bin/sh
 
-rm -rf oscon_demo
-rm -rf oscon_demo_repl
-rm -rf /tmp/wal
+source variables.sh
+
+pg_ctl -D $DATA_DIR stop -m immediate
+pg_ctl -D ${DATA_DIR}_repl stop -m immediate
+
+rm -rf $DATA_DIR
+rm -rf ${DATA_DIR}_repl
+rm -rf $WAL
