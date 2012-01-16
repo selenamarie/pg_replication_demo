@@ -1,0 +1,5 @@
+This repo contains a shell script for creating a demo of Postgres' replication capabilities. 
+
+Not very well documented, patches welcome :)
+
+These probably shouldn't be used for production code, but might help you understand how to set up replication a little more quickly than if you read through all the replication docs. 
