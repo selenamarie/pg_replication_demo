@@ -14,19 +14,29 @@ $INITDB -D ${DATA_DIR} -E UTF8
 mkdir $WAL
 
 #### Update pg_hba.conf ####
+(
+cat <<-DEMO
+	local   replication     selena                                trust
+	local   selena          selena                                trust
+	host    replication     selena        127.0.0.1/32            trust
+	host    replication     selena        ::1/128                 trust
+DEMO
+)  >> ${DEMO}/pg_hba.conf
 
-echo "local   replication     selena                                trust" >> ${DEMO}/pg_hba.conf
-echo "local   selena          selena                                trust" >> ${DEMO}/pg_hba.conf
-echo "host    replication     selena        127.0.0.1/32            trust" >> ${DEMO}/pg_hba.conf
-echo "host    replication     selena        ::1/128                 trust" >> ${DEMO}/pg_hba.conf
+echo "done hba"
 
 #### Update postgresql.conf for master db ####
+(
+cat <<-DEMOPG
+	wal_level = 'hot_standby'
+	max_wal_senders = 10
+	archive_mode  = on
+	archive_command  = 'test ! -f ${WAL}/%f && cp -i %p ${WAL}/%f'
+	wal_keep_segments = 100
+DEMOPG
+) >> ${DEMO}/postgresql.conf
 
-echo "wal_level = 'hot_standby'"                                           >> ${DEMO}/postgresql.conf
-echo "max_wal_senders = 10"                                                >> ${DEMO}/postgresql.conf
-echo "archive_mode  = on"                                                  >> ${DEMO}/postgresql.conf
-echo "archive_command  = 'test ! -f ${WAL}/%f && cp -i %p ${WAL}/%f'"      >> ${DEMO}/postgresql.conf
-echo "wal_keep_segments = 100"                                             >> ${DEMO}/postgresql.conf
+echo "done postgresql.conf"
 #echo "synchronous_standby_names = '${DEMO}'"                              >> ${DEMO}/postgresql.conf
 
 #### Start postgres master ####
@@ -46,20 +56,33 @@ sleep 2
 echo "hot_standby = on"                                                                     >> ${DEMO_REPL}/postgresql.conf
 
 #### Create recovery.conf ####
-echo "restore_command = 'cp -i ${WAL}/%f %p'"                                               >> ${DEMO_REPL}/recovery.conf 
-echo "standby_mode = on"                                                                    >> ${DEMO_REPL}/recovery.conf
-echo "primary_conninfo = 'host=localhost port=5432 user=selena'"                            >> ${DEMO_REPL}/recovery.conf
-echo "trigger_file = '/tmp/trig_recovery'"                                                  >> ${DEMO_REPL}/recovery.conf
-echo "wal_keep_segments = 100"                                                              >> ${DEMO_REPL}/postgresql.conf
-#echo "primary_conninfo = 'host=localhost port=5432 user=selena application_name=${DEMO}'"  >> ${DEMO_REPL}/recovery.conf
+(
+cat <<-DEMOREPL
+	restore_command = 'cp -i ${WAL}/%f %p'
+	standby_mode = on
+	primary_conninfo = 'host=localhost port=5432 user=selena'
+	trigger_file = '/tmp/trig_recovery'
+DEMOREPL
+) >> ${DEMO_REPL}/recovery.conf
 
 #### Change port listener for replication ####
-echo "port = 5433"                                                                          >> ${DEMO_REPL}/postgresql.conf
+( 
+cat <<-DEMOREPLPG
+	wal_keep_segments = 100
+	port = 5433
+DEMOREPLPG
+) >> ${DEMO_REPL}/postgresql.conf
 
-echo "local   replication     selena                                trust" >> ${DEMO_REPL}/pg_hba.conf
-echo "local   selena          selena                                trust" >> ${DEMO_REPL}/pg_hba.conf
-echo "host    replication     selena        127.0.0.1/32            trust" >> ${DEMO_REPL}/pg_hba.conf
-echo "host    replication     selena        ::1/128                 trust" >> ${DEMO_REPL}/pg_hba.conf
+#echo "primary_conninfo = 'host=localhost port=5432 user=selena application_name=${DEMO}'"  >> ${DEMO_REPL}/recovery.conf
+
+(
+cat <<-DEMOREPLHBA
+	local   replication     selena                                trust
+	local   selena          selena                                trust
+	host    replication     selena        127.0.0.1/32            trust
+	host    replication     selena        ::1/128                 trust
+DEMOREPLHBA
+) >> ${DEMO_REPL}/pg_hba.conf
 
 echo "#### Starting repl ####"
 #### Starting replication ####
@@ -74,22 +97,30 @@ echo "#### Creating other base backups ####"
 $PGBASEBACKUP -D ${DEMO_REPL2} -U selena -v
 $PGBASEBACKUP -D ${DEMO_REPL3} -U selena -v
 
-#### Create recovery.conf ####
+#### Create .conf ####
 for i in ${DEMO_REPL2} ${DEMO_REPL3} ; do 
-    echo "restore_command = 'cp -i ${WAL}/%f %p'"                                                >> $i/recovery.conf 
-    echo "standby_mode = on"                                                                     >> $i/recovery.conf
-    echo "primary_conninfo = 'host=localhost port=5433 user=selena'"                             >> $i/recovery.conf
-    echo "trigger_file = '/tmp/trig_recovery'"                                                   >> $i/recovery.conf
-    echo "archive_command  = '/bin/true'"                                                        >> $i/postgresql.conf
-    echo "hot_standby = on"                                                                      >> $i/postgresql.conf
-    # echo "primary_conninfo = 'host=localhost port=5433 user=selena application_name=${DEMO}'"  >> $i/recovery.conf
+	(
+	cat <<-DEMORECOVERY
+		restore_command = 'cp -i ${WAL}/%f %p'
+		standby_mode = on
+		primary_conninfo = 'host=localhost port=5433 user=selena'
+		trigger_file = '/tmp/trig_recovery'
+	DEMORECOVERY
+	) >> $i/recovery.conf
+	( 
+	cat <<-DEMORECOVERYPG
+		archive_command  = '/bin/true'
+		hot_standby = on
+	DEMORECOVERYPG
+	) >> $i/postgresql.conf
 done
+# primary_conninfo = 'host=localhost port=5433 user=selena application_name=${DEMO}'
 
 perl -pi -e 's/trig_recovery/trig_recovery2/' ${DEMO_REPL2}/recovery.conf
 perl -pi -e 's/trig_recovery/trig_recovery3/' ${DEMO_REPL3}/recovery.conf
 
-echo "port = 5434"                                            >> ${DEMO_REPL2}/postgresql.conf
-echo "port = 5435"                                            >> ${DEMO_REPL3}/postgresql.conf
+echo "port = 5434"  >> ${DEMO_REPL2}/postgresql.conf
+echo "port = 5435"  >> ${DEMO_REPL3}/postgresql.conf
 
 #### Start 'em up ####
 echo "#### Starting up the replicated systems ####"
@@ -100,3 +131,13 @@ for a in ${DEMO_REPL2} ${DEMO_REPL3}; do
 done
 
 echo "Done!"
+
+sleep 1
+
+ps -ef | grep postgres
+
+echo 
+
+sleep 5
+
+ps -ef | grep postgres
