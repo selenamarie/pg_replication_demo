@@ -2,11 +2,10 @@
 
 source variables.sh
 
-pg_ctl -D $DATA_DIR stop -m immediate
-pg_ctl -D ${DATA_DIR}_repl stop -m immediate
+for i in ${DATA_DIR} ${DEMO_REPL} ${DEMO_REPL2} ${DEMO_REPL3} ; do
+    pg_ctl -D $i stop -m immediate
+    rm -rf $i
+    rm -rf $i.log
+done
 
-rm -rf $DATA_DIR
-rm -rf $DATA_DIR.log
-rm -rf ${DATA_DIR}_repl
-rm -rf ${DATA_DIR}_repl.log
 rm -rf $WAL
