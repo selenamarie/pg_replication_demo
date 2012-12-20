@@ -1,7 +1,15 @@
-DATA_DIR=lca_demo
-# export PATH=/opt/pg91beta2/bin:$PATH
-WAL=/tmp/lca_demo_wal
+DATA_DIR=demo
+
+export BINDIR=/usr/lib/postgresql/9.2/bin
+export PATH=/usr/lib/postgresql/9.2/bin:$PATH
+PORT=7000
+PORT1=7001
+PORT2=7002
+PORT3=7003
+
+WAL=/tmp/demo_wal
 DEMO=$DATA_DIR
-DEMO_REPL=lca_demo_repl
-DEMO_REPL2=lca_demo_repl2
-DEMO_REPL3=lca_demo_repl3
+DEMO_REPL=demo_repl
+DEMO_REPL2=demo_repl2
+DEMO_REPL3=demo_repl3
+

@@ -1,10 +1,11 @@
 #!/bin/bash
 
 source variables.sh
-PSQL='/demo/pg92/bin/psql postgres -c'
-PGCTL="/demo/pg92/bin/pg_ctl"
-INITDB=/demo/pg92/bin/initdb
-PGBASEBACKUP=/demo/pg92/bin/pg_basebackup
+
+PSQL="$BINDIR/psql postgres -c"
+PGCTL="$BINDIR/pg_ctl"
+INITDB="$BINDIR/initdb"
+PGBASEBACKUP="$BINDIR/pg_basebackup -h /tmp -p ${PORT}"
 
 #### Create Master ####
 $INITDB -D ${DATA_DIR} -E UTF8 
@@ -17,7 +18,6 @@ mkdir $WAL
 (
 cat <<-DEMO
 	local   replication     selena                                trust
-	local   selena          selena                                trust
 	host    replication     selena        127.0.0.1/32            trust
 	host    replication     selena        ::1/128                 trust
 DEMO
@@ -33,6 +33,8 @@ cat <<-DEMOPG
 	archive_mode  = on
 	archive_command  = 'test ! -f ${WAL}/%f && cp -i %p ${WAL}/%f'
 	wal_keep_segments = 100
+	port = ${PORT}
+	unix_socket_directory = '/tmp'
 DEMOPG
 ) >> ${DEMO}/postgresql.conf
 
@@ -60,7 +62,7 @@ echo "hot_standby = on"                                                         
 cat <<-DEMOREPL
 	restore_command = 'cp -i ${WAL}/%f %p'
 	standby_mode = on
-	primary_conninfo = 'host=localhost port=5432 user=selena'
+	primary_conninfo = 'host=localhost port=${PORT} user=selena'
 	trigger_file = '/tmp/trig_recovery'
 DEMOREPL
 ) >> ${DEMO_REPL}/recovery.conf
@@ -69,11 +71,11 @@ DEMOREPL
 ( 
 cat <<-DEMOREPLPG
 	wal_keep_segments = 100
-	port = 5433
+	port = ${PORT1}
 DEMOREPLPG
 ) >> ${DEMO_REPL}/postgresql.conf
 
-#echo "primary_conninfo = 'host=localhost port=5432 user=selena application_name=${DEMO}'"  >> ${DEMO_REPL}/recovery.conf
+#echo "primary_conninfo = 'host=localhost port=${PORT} user=selena application_name=${DEMO}'"  >> ${DEMO_REPL}/recovery.conf
 
 (
 cat <<-DEMOREPLHBA
@@ -103,7 +105,7 @@ for i in ${DEMO_REPL2} ${DEMO_REPL3} ; do
 	cat <<-DEMORECOVERY
 		restore_command = 'cp -i ${WAL}/%f %p'
 		standby_mode = on
-		primary_conninfo = 'host=localhost port=5433 user=selena'
+		primary_conninfo = 'host=localhost port=${PORT} user=selena'
 		trigger_file = '/tmp/trig_recovery'
 	DEMORECOVERY
 	) >> $i/recovery.conf
@@ -114,13 +116,13 @@ for i in ${DEMO_REPL2} ${DEMO_REPL3} ; do
 	DEMORECOVERYPG
 	) >> $i/postgresql.conf
 done
-# primary_conninfo = 'host=localhost port=5433 user=selena application_name=${DEMO}'
+# primary_conninfo = 'host=localhost port=${PORT1} user=selena application_name=${DEMO}'
 
 perl -pi -e 's/trig_recovery/trig_recovery2/' ${DEMO_REPL2}/recovery.conf
 perl -pi -e 's/trig_recovery/trig_recovery3/' ${DEMO_REPL3}/recovery.conf
 
-echo "port = 5434"  >> ${DEMO_REPL2}/postgresql.conf
-echo "port = 5435"  >> ${DEMO_REPL3}/postgresql.conf
+echo "port = ${PORT2}"  >> ${DEMO_REPL2}/postgresql.conf
+echo "port = ${PORT3}"  >> ${DEMO_REPL3}/postgresql.conf
 
 #### Start 'em up ####
 echo "#### Starting up the replicated systems ####"
