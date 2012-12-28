@@ -2,6 +2,7 @@
 
 source variables.sh
 
+USER=selena
 PSQL="$BINDIR/psql postgres -c"
 PGCTL="$BINDIR/pg_ctl"
 INITDB="$BINDIR/initdb"
@@ -17,9 +18,9 @@ mkdir $WAL
 #### Update pg_hba.conf ####
 (
 cat <<-DEMO
-	local   replication     selena                                trust
-	host    replication     selena        127.0.0.1/32            trust
-	host    replication     selena        ::1/128                 trust
+	local   replication     $USER                                trust
+	host    replication     $USER        127.0.0.1/32            trust
+	host    replication     $USER        ::1/128                 trust
 DEMO
 )  >> ${DEMO}/pg_hba.conf
 
@@ -49,7 +50,7 @@ sleep 2
 echo "#### Making base backup ####"
 
 #### Make a base backup ####
-$PGBASEBACKUP -D ${DEMO_REPL} -U selena -v
+$PGBASEBACKUP -D ${DEMO_REPL} -U $USER -v
 
 sleep 2
 
@@ -62,7 +63,7 @@ echo "hot_standby = on"                                                         
 cat <<-DEMOREPL
 	restore_command = 'cp -i ${WAL}/%f %p'
 	standby_mode = on
-	primary_conninfo = 'host=localhost port=${PORT} user=selena'
+	primary_conninfo = 'host=localhost port=${PORT} user=$USER'
 	trigger_file = '/tmp/trig_recovery'
 DEMOREPL
 ) >> ${DEMO_REPL}/recovery.conf
@@ -75,14 +76,14 @@ cat <<-DEMOREPLPG
 DEMOREPLPG
 ) >> ${DEMO_REPL}/postgresql.conf
 
-#echo "primary_conninfo = 'host=localhost port=${PORT} user=selena application_name=${DEMO}'"  >> ${DEMO_REPL}/recovery.conf
+#echo "primary_conninfo = 'host=localhost port=${PORT} user=$USER application_name=${DEMO}'"  >> ${DEMO_REPL}/recovery.conf
 
 (
 cat <<-DEMOREPLHBA
-	local   replication     selena                                trust
-	local   selena          selena                                trust
-	host    replication     selena        127.0.0.1/32            trust
-	host    replication     selena        ::1/128                 trust
+	local   replication     $USER                                trust
+	local   $USER          $USER                                trust
+	host    replication     $USER        127.0.0.1/32            trust
+	host    replication     $USER        ::1/128                 trust
 DEMOREPLHBA
 ) >> ${DEMO_REPL}/pg_hba.conf
 
@@ -90,14 +91,14 @@ echo "#### Starting repl ####"
 #### Starting replication ####
 $PGCTL -D ${DEMO_REPL} start -l ${DEMO_REPL}.log
 
-echo "#### Creating database selena ####"
-$PSQL "create database selena"
+echo "#### Creating database $USER ####"
+$PSQL "create database $USER"
 
 #### Set up cascaded slaves ####
 
 echo "#### Creating other base backups ####"
-$PGBASEBACKUP -D ${DEMO_REPL2} -U selena -v
-$PGBASEBACKUP -D ${DEMO_REPL3} -U selena -v
+$PGBASEBACKUP -D ${DEMO_REPL2} -U $USER -v
+$PGBASEBACKUP -D ${DEMO_REPL3} -U $USER -v
 
 #### Create .conf ####
 for i in ${DEMO_REPL2} ${DEMO_REPL3} ; do 
@@ -105,7 +106,7 @@ for i in ${DEMO_REPL2} ${DEMO_REPL3} ; do
 	cat <<-DEMORECOVERY
 		restore_command = 'cp -i ${WAL}/%f %p'
 		standby_mode = on
-		primary_conninfo = 'host=localhost port=${PORT} user=selena'
+		primary_conninfo = 'host=localhost port=${PORT} user=$USER'
 		trigger_file = '/tmp/trig_recovery'
 	DEMORECOVERY
 	) >> $i/recovery.conf
@@ -116,7 +117,7 @@ for i in ${DEMO_REPL2} ${DEMO_REPL3} ; do
 	DEMORECOVERYPG
 	) >> $i/postgresql.conf
 done
-# primary_conninfo = 'host=localhost port=${PORT1} user=selena application_name=${DEMO}'
+# primary_conninfo = 'host=localhost port=${PORT1} user=$USER application_name=${DEMO}'
 
 perl -pi -e 's/trig_recovery/trig_recovery2/' ${DEMO_REPL2}/recovery.conf
 perl -pi -e 's/trig_recovery/trig_recovery3/' ${DEMO_REPL3}/recovery.conf

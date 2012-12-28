@@ -1,0 +1,23 @@
+Building repmgr on Ubuntu:
+
+  sudo apt-get install libxslt-dev libxml2-dev libpam-dev libedit-dev
+  sudo apt-get install postgresql-server-dev-9.0
+
+Build repmgr:
+  cd contrib
+  git clone git://github.com/2ndQuadrant/repmgr.git
+  cd repmgr
+  make USE_PGXS=1
+  make USE_PGXS=1 install
+
+Link to the binaries the debian way:
+  sudo update-alternatives --install /usr/bin/repmgr repmgr /usr/lib/postgresql/9.2/bin/repmgr 10
+  sudo update-alternatives --install /usr/bin/repmgrd repmgrd /usr/lib/postgresql/9.2/bin/repmgrd 10
+
+
+Test:
+
+  repmgr --version
+  repmgrd --version
+
+
