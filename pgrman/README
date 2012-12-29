@@ -1,0 +1,9 @@
+
+Download: http://pg-rman.googlecode.com/files/pg_rman-1.2.4.tar.gz
+
+make USE_PGXS=1
+sudo make USE_PGXS=1 install
+
+Installs in: /usr/lib/postgresql/9.2/bin
+
+sudo update-alternatives --install /usr/bin/pg_rman pg_rman /usr/lib/postgresql/9.2/bin/pg_rman 10
