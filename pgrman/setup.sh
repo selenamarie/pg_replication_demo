@@ -33,7 +33,7 @@ $PSQL -p $PORT -U $USER postgres -c "CREATE DATABASE pgbench"
 /usr/lib/postgresql/9.2/bin/pgbench -i -s 1 pgbench -h /tmp -p ${PORT}
 
 # Set up pg_rman
-echo "Setting up barman"
+echo "Setting up pg_rman"
 mkdir -p $RMANHOMEDIR
 mkdir -p $ARCDIR
 sudo mkdir -p $LOGDIR
@@ -44,7 +44,7 @@ pg_rman init -B $RMANHOMEDIR
 
 # Set up conf file
 (
-cat <<-BARMANCONF
+cat <<-RMANCONF
 ARCLOG_PATH = $ARCDIR
 SRVLOG_PATH = $HOMEDIR/${DEMO}/pg_log
 
@@ -56,7 +56,7 @@ KEEP_DATA_GENERATIONS = 3
 KEEP_DATA_DAYS = 120
 KEEP_SRVLOG_FILES = 10
 KEEP_SRVLOG_DAYS = 10
-BARMANCONF
+RMANCONF
 ) > $RMANHOMEDIR/pg_rman.ini
 
 THISMONTH=$(date +%Y-%m)
