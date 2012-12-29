@@ -1,0 +1,13 @@
+Setting up skytools and walmgr
+
+* Couldn't install from packages because of unfortunate 9.1 dependency problems
+* Install using instructions re: git repo from INSTALL doc worked perfectly
+
+https://github.com/markokr/skytools/blob/master/doc/walmgr3.txt
+
+* --not-really option WOW thank god
+
+
+
+
+
