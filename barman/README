@@ -1,0 +1,14 @@
+
+Docs:
+http://docs.pgbarman.org/
+
+To setup:
+
+* Cloned pgbarman repo
+* ran sudo ./setup.py install
+
+# First run complained about missing dep:
+* sudo easy_install argcomplete
+
+Setup as in:
+http://docs.pgbarman.org/#getting_started
