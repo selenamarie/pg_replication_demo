@@ -24,6 +24,7 @@ sleep 3
 (
 cat <<-REPLICA
 slave_config = $HOMEDIR/wal-slave.ini
+primary_conninfo = host=localhost port=$PORT user=$USER
 REPLICA
 ) >> wal-master.ini
 
@@ -40,13 +41,15 @@ $PSQL -p $PORT -U $USER postgres -c "CREATE DATABASE pgbench"
 echo "## Setting up walmgr3"
 walmgr3 $HOMEDIR/wal-master.ini setup
 
-mkdir -p $HOMEDIR/test2
+#mkdir -p $HOMEDIR/test2
 
 echo "## Backing up"
 walmgr3 $HOMEDIR/wal-master.ini backup
 echo "## Done with backup"
 
-exit
+echo "## Creating replica"
+walmgr3 $HOMEDIR/wal-slave.ini restore data.master
+echo "## Done with creating replica"
 
 ( 
 cat <<-NEWPORT
@@ -54,14 +57,8 @@ port=$PORT2
 NEWPORT
 ) >> ${DEMO2}/postgresql.conf
 
+echo "## Starting $DEMO2"
 $PGCTL -D ${DEMO2} start > ${DEMO2}.log 2>&1
 
-repmgr -f ${REPMGRCONF}/repmgr.conf --verbose master register 
+echo "# DONE"
 
-PGENGINE=/usr/lib/postgresql/9.2/bin PATH="$PATH:$PGENGINE" repmgrd -f ${REPMGRCONF}/repmgr.conf --verbose > ${REPLOG}/repmgr.log 2>&1 & 
-
-sleep 4
-
-PGENGINE=/usr/lib/postgresql/9.2/bin PATH="$PATH:$PGENGINE" repmgrd -f ${REPMGRCONF}/repmgr2.conf --verbose > ${REPLOG}/repmgr2.log 2>&1 & 
-
-#repmgr -f ${REPMGRCONF}/repmgr2.conf --verbose standby register
